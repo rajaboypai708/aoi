@@ -1,0 +1,1646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Compile - Standalone Auto-Edition</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000432">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AI Compile">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
+<link rel="apple-touch-icon" sizes="144x144" href="icons/icon-144.png">
+<link rel="apple-touch-icon" sizes="128x128" href="icons/icon-128.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-96.png">
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyACcNGFYA-q8WFLyjDifARJFU_8INYveU8",
+    authDomain: "raja-98d26.firebaseapp.com",
+    databaseURL: "https://raja-98d26-default-rtdb.firebaseio.com",
+    projectId: "raja-98d26",
+    storageBucket: "raja-98d26.firebasestorage.app",
+    messagingSenderId: "748276211835",
+    appId: "1:748276211835:web:a64c6aa85659a767b342de"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  // ── Firebase helpers exposed to main script ──
+  window._fbSaveConfig = async function(cfg) {
+    await set(ref(db, 'aicompiler/gh_config'), cfg);
+  };
+  window._fbLoadConfig = async function() {
+    const snap = await get(ref(db, 'aicompiler/gh_config'));
+    return snap.exists() ? snap.val() : null;
+  };
+  window._fbReady = true;
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #000432; font-family: 'JetBrains Mono', monospace; padding-bottom: 100px; }
+
+#preview {
+  position: fixed; inset: 0; bottom: 134px;
+  width: 100%; height: calc(100% - 134px);
+  border: none; background: #000432;
+  z-index: 1;
+}
+
+#codeView {
+  position: fixed; inset: 0; bottom: 134px;
+  width: 100%; height: calc(100% - 134px);
+  border: none; background: #000432;
+  color: #f8f8f2; font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; padding: 20px; outline: none;
+  resize: none; z-index: 2; display: none;
+  white-space: pre; overflow: auto; line-height: 1.5;
+}
+
+#fring {
+  position: fixed; inset: 0; bottom: 100px; z-index: 99;
+  border: 3px solid #00ff88;
+  box-shadow: inset 0 0 60px rgba(0, 255, 136, .12);
+  pointer-events: none; opacity: 0; transition: opacity .5s;
+}
+
+/* ── Repo Button Bar ── */
+#shortcutBar {
+  position: fixed; bottom: 100px; left: 0; width: 100%; height: 34px;
+  background: rgba(0, 4, 50, 0.95); border-top: 1px solid rgba(255, 184, 108, 0.2);
+  z-index: 102; display: flex; align-items: center; justify-content: center;
+  padding: 0 8px; gap: 5px; overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none; backdrop-filter: blur(14px);
+}
+#shortcutBar::-webkit-scrollbar { display: none; }
+#shortcutBar .sc-btn {
+  background: rgba(0,0,0,0.5); border: 1px solid rgba(255,184,108,0.3);
+  color: #ffb86c; padding: 4px 10px; border-radius: 6px;
+  font: 700 10px/1 'JetBrains Mono', monospace;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  transition: all 0.15s; outline: none;
+}
+#shortcutBar .sc-btn:hover { background: rgba(255,184,108,0.15); border-color: #ffb86c; }
+#shortcutBar .sc-btn.active { background: rgba(255,184,108,0.2); border-color: #ffb86c; box-shadow: 0 0 8px rgba(255,184,108,0.25); }
+#shortcutBar .sc-add-btn {
+  background: transparent; border: 1px dashed rgba(255,184,108,0.3);
+  color: rgba(255,184,108,0.5); padding: 4px 8px; border-radius: 6px;
+  font: 700 11px/1 'JetBrains Mono', monospace;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all 0.15s;
+}
+#shortcutBar .sc-add-btn:hover { border-color: #ffb86c; color: #ffb86c; background: rgba(255,184,108,0.08); }
+#shortcutBar .sc-label {
+  color: rgba(255,184,108,0.5); font: 12px 'JetBrains Mono', monospace;
+  padding: 0 4px; flex-shrink: 0;
+}
+#shortcutBar .sc-lock-btn {
+  background: transparent; border: 1px solid rgba(255,184,108,0.25);
+  color: rgba(255,184,108,0.4); padding: 3px 7px; border-radius: 6px;
+  font: 700 11px/1 'JetBrains Mono', monospace;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all 0.15s;
+}
+#shortcutBar .sc-lock-btn:hover { border-color: #ffb86c; color: #ffb86c; background: rgba(255,184,108,0.08); }
+#shortcutBar .sc-lock-btn.locked { border-color: rgba(255,184,108,0.5); color: #ffb86c; background: rgba(255,184,108,0.1); }
+
+#shortcutBar .sc-collapse-btn {
+  background: transparent; border: 1px solid rgba(255,184,108,0.25);
+  color: rgba(255,184,108,0.4); padding: 3px 7px; border-radius: 6px;
+  font: 700 11px/1 'JetBrains Mono', monospace;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all 0.15s;
+}
+#shortcutBar .sc-collapse-btn:hover { border-color: #ffb86c; color: #ffb86c; background: rgba(255,184,108,0.08); }
+#shortcutBar .sc-collapse-btn.collapsed { border-color: rgba(255,184,108,0.5); color: #ffb86c; background: rgba(255,184,108,0.1); }
+
+body.ui-collapsed #repoBar,
+body.ui-collapsed #controlBar,
+body.ui-collapsed #statusBar { display: none !important; }
+
+body.ui-collapsed #shortcutBar {
+  bottom: 0;
+  height: 44px;
+  border-top: 1px solid rgba(255, 184, 108, 0.4);
+  box-shadow: 0 -4px 20px rgba(255,184,108,0.08);
+}
+
+body.ui-collapsed #preview {
+  bottom: 44px;
+  height: calc(100% - 44px);
+}
+
+body.ui-collapsed #codeView {
+  bottom: 44px;
+  height: calc(100% - 44px);
+}
+
+body.ui-collapsed #fring {
+  bottom: 44px;
+}
+
+body.ui-collapsed #ghConfigPanel {
+  bottom: 50px;
+}
+
+body.ui-collapsed #toast {
+  bottom: 52px;
+}
+
+#repoBar {
+  position: fixed; bottom: 66px; left: 0; width: 100%; height: 34px;
+  background: rgba(0, 0, 20, 0.97); border-top: 1px solid rgba(139, 233, 253, 0.15);
+  z-index: 101; display: flex; align-items: center;
+  padding: 0 8px; gap: 5px; overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none; backdrop-filter: blur(14px);
+}
+#repoBar::-webkit-scrollbar { display: none; }
+#repoBar .repo-btn {
+  background: rgba(0,0,0,0.5); border: 1px solid rgba(139,233,253,0.25);
+  color: #8be9fd; padding: 4px 10px; border-radius: 6px;
+  font: 700 10px/1 'JetBrains Mono', monospace;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  transition: all 0.15s; outline: none;
+}
+#repoBar .repo-btn:hover { background: rgba(139,233,253,0.12); border-color: #8be9fd; }
+#repoBar .repo-btn.active {
+  background: rgba(0,255,136,0.15); border-color: #00ff88;
+  color: #00ff88; box-shadow: 0 0 8px rgba(0,255,136,0.2);
+}
+#repoBar .repo-bar-empty {
+  color: rgba(139,233,253,0.35); font: 10px 'JetBrains Mono', monospace;
+  padding: 0 8px;
+}
+#fring.on { opacity: 1; }
+
+/* Status Bar */
+#statusBar {
+  position: fixed; bottom: 0; left: 0; width: 100%; height: 22px;
+  background: rgba(0, 0, 0, 0.9); border-top: 1px solid #333; z-index: 999;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 15px; font-size: 11px; color: #8be9fd; letter-spacing: 0.5px;
+}
+.status-item { opacity: 0.8; }
+
+#controls { display: flex; gap: 6px; flex-wrap: nowrap; align-items: center; }
+#bottom-controls { display: flex; gap: 6px; align-items: center; }
+#git-controls { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+
+#controlBar {
+  position: fixed; bottom: 22px; left: 0; width: 100%; height: 44px;
+  background: rgba(0, 4, 50, 0.97); border-top: 1px solid rgba(0, 255, 136, 0.25);
+  z-index: 100; display: flex; align-items: center;
+  padding: 0 10px; gap: 6px; overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none; backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(139,233,253,0.1);
+}
+#controlBar::-webkit-scrollbar { display: none; }
+#controlBar .ctrl-sep {
+  width: 1px; height: 22px; background: rgba(255,255,255,0.12); flex-shrink: 0; margin: 0 4px;
+}
+
+button.btn, select.btn, input.btn {
+  background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(0, 255, 136, 0.3);
+  color: #00ff88; padding: 10px 16px; border-radius: 8px;
+  font: 700 11px/1 'JetBrains Mono', monospace;
+  cursor: pointer; backdrop-filter: blur(12px); outline: none;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); transition: all 0.2s ease;
+  white-space: nowrap; flex-shrink: 0;
+}
+input.btn { cursor: text; color: #f1fa8c; width: 220px; }
+input.btn::placeholder { color: rgba(241, 250, 140, 0.5); }
+select.btn { padding: 9px 12px; }
+button.btn:hover, select.btn:hover, input.btn:focus { 
+  background: rgba(0, 255, 136, 0.15); border-color: #00ff88; transform: translateY(-2px);
+}
+button.btn:active { transform: scale(0.96); }
+button.btn:disabled { opacity: 0.5; cursor: not-allowed; border-color: #555; color: #888; transform: none !important; }
+
+#toast {
+  position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%);
+  padding: 8px 20px; border-radius: 20px; font: 700 11px/1 'JetBrains Mono', monospace;
+  letter-spacing: .5px; background: rgba(0, 0, 0, .85);
+  border: 1px solid rgba(0, 255, 136, .4); color: #00ff88;
+  backdrop-filter: blur(8px); z-index: 100; pointer-events: none;
+  opacity: 0; transition: opacity .25s, transform .25s;
+}
+#toast.show { opacity: 1; transform: translate(-50%, -5px); }
+
+#astPanel {
+  position: fixed; top: 70px; left: 20px; z-index: 98;
+  background: rgba(0, 0, 0, 0.88); border: 1px solid #444; border-radius: 8px;
+  padding: 14px; color: #fff; font-size: 10px; font-family: 'JetBrains Mono', monospace;
+  backdrop-filter: blur(10px); width: 280px; max-height: 75vh; overflow-y: auto;
+  display: none; line-height: 1.7;
+}
+#astPanel h4 { color: #8be9fd; margin-bottom: 8px; font-size: 11px; }
+.ast-ok   { color: #50fa7b; }
+.ast-err  { color: #ff5555; font-weight: 700; }
+.ast-warn { color: #ffb86c; }
+
+#errOverlay {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: rgba(20, 0, 0, 0.97); border: 1px solid #ff5555; border-radius: 10px;
+  padding: 14px 16px 12px; color: #fff; font: 700 11px/1.6 'JetBrains Mono', monospace;
+  z-index: 200; min-width: 340px; max-width: 600px; display: none; white-space: pre-wrap;
+  backdrop-filter: blur(12px); box-shadow: 0 0 30px rgba(255,85,85,0.25);
+}
+#errOverlay .err-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+}
+#errOverlay .err-title { color: #ff5555; font-size: 12px; letter-spacing: 0.5px; }
+#errOverlay .err-body {
+  color: #ffb8b8; font-weight: 400; font-size: 11px; line-height: 1.6;
+  max-height: 160px; overflow-y: auto; margin-bottom: 10px; word-break: break-word;
+}
+#errOverlay .err-actions { display: flex; gap: 8px; justify-content: flex-end; }
+#errOverlay .err-btn {
+  background: rgba(255,85,85,0.15); border: 1px solid #ff5555; color: #ff5555;
+  padding: 5px 14px; border-radius: 6px; font: 700 10px/1 'JetBrains Mono', monospace;
+  cursor: pointer; transition: background 0.15s;
+}
+#errOverlay .err-btn:hover { background: rgba(255,85,85,0.3); }
+#errOverlay .err-btn.copy { border-color: #ffb86c; color: #ffb86c; background: rgba(255,184,108,0.1); }
+#errOverlay .err-btn.copy:hover { background: rgba(255,184,108,0.25); }
+
+#modeToggle { display: none; align-items: center; flex-shrink: 0; }
+
+/* ── GitHub Config Panel ── */
+#ghConfigPanel {
+  position: fixed; bottom: 72px; right: 16px; z-index: 300;
+  background: rgba(4, 8, 60, 0.97); border: 1px solid rgba(139, 233, 253, 0.4);
+  border-radius: 12px; padding: 18px 20px; width: 380px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #f8f8f2;
+  backdrop-filter: blur(16px); box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  display: none; flex-direction: column; gap: 12px;
+}
+#ghConfigPanel.open { display: flex; }
+#ghConfigPanel h4 { color: #8be9fd; font-size: 12px; margin-bottom: 2px; letter-spacing: 0.5px; }
+#ghConfigPanel .gh-row { display: flex; gap: 8px; align-items: center; }
+#ghConfigPanel label { color: #6272a4; font-size: 10px; min-width: 70px; }
+#ghConfigPanel input[type="text"], #ghConfigPanel input[type="password"] {
+  flex: 1; background: rgba(0,0,0,0.5); border: 1px solid rgba(139,233,253,0.25);
+  color: #f8f8f2; padding: 6px 10px; border-radius: 6px;
+  font: 11px 'JetBrains Mono', monospace; outline: none;
+}
+#ghConfigPanel input:focus { border-color: #8be9fd; }
+#ghConfigPanel .gh-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+#ghConfigPanel .gh-btn {
+  background: rgba(0,0,0,0.5); border: 1px solid rgba(139,233,253,0.4);
+  color: #8be9fd; padding: 6px 14px; border-radius: 6px;
+  font: 700 10px 'JetBrains Mono', monospace; cursor: pointer; transition: all 0.15s;
+}
+#ghConfigPanel .gh-btn:hover { background: rgba(139,233,253,0.15); border-color: #8be9fd; }
+#ghConfigPanel .gh-btn.save { border-color: #00ff88; color: #00ff88; }
+#ghConfigPanel .gh-btn.save:hover { background: rgba(0,255,136,0.15); }
+#ghConfigPanel .gh-hint { color: #6272a4; font-size: 9px; line-height: 1.5; }
+#ghConfigPanel .gh-repo-list { display: flex; flex-direction: column; gap: 4px; max-height: 120px; overflow-y: auto; }
+#ghConfigPanel .gh-repo-item {
+  display: flex; gap: 6px; align-items: center;
+  background: rgba(0,0,0,0.3); border-radius: 6px; padding: 4px 8px;
+}
+#ghConfigPanel .gh-repo-item input[type="text"] { flex: 1; font-size: 10px; padding: 4px 8px; }
+#ghConfigPanel .gh-repo-item .gh-star { color: #f1fa8c; cursor: pointer; font-size: 13px; }
+#ghConfigPanel .gh-repo-item .gh-star.active { color: #ffd700; text-shadow: 0 0 6px #ffd700; }
+#ghConfigPanel .gh-repo-item .gh-del { color: #ff5555; cursor: pointer; font-size: 13px; margin-left: 2px; }
+#ghConfigPanel .gh-add-row { display: flex; gap: 6px; }
+#ghConfigPanel .gh-add-row input { flex: 1; font-size: 10px; }
+
+/* ── Push button in controlBar ── */
+#pushBtn {
+  background: rgba(0,0,0,0.6); border: 1px solid rgba(255,121,198,0.5);
+  color: #ff79c6; padding: 10px 14px; border-radius: 8px;
+  font: 700 11px/1 'JetBrains Mono', monospace;
+  cursor: pointer; flex-shrink: 0; transition: all 0.2s;
+}
+#pushBtn:hover:not(:disabled) { background: rgba(255,121,198,0.15); border-color: #ff79c6; transform: translateY(-2px); }
+#pushBtn:disabled { opacity: 0.4; cursor: not-allowed; border-color: #555; color: #888; transform: none; }
+#pushBtn.pushing { border-color: #ffb86c; color: #ffb86c; animation: pushpulse 0.7s infinite alternate; }
+@keyframes pushpulse { from { opacity: 0.6; } to { opacity: 1; } }
+
+#ghSettingsBtn {
+  background: rgba(0,0,0,0.6); border: 1px solid rgba(139,233,253,0.35);
+  color: #8be9fd; padding: 10px 10px; border-radius: 8px;
+  font: 700 12px/1 'JetBrains Mono', monospace;
+  cursor: pointer; flex-shrink: 0; transition: all 0.2s;
+}
+#ghSettingsBtn:hover { background: rgba(139,233,253,0.1); border-color: #8be9fd; transform: translateY(-2px); }
+#ghSettingsBtn.active { border-color: #00ff88; color: #00ff88; }
+
+/* Commit message modal */
+#commitModal {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,0.7); display: none;
+  align-items: center; justify-content: center; backdrop-filter: blur(4px);
+}
+#commitModal.open { display: flex; }
+#commitModalBox {
+  background: rgba(4, 8, 60, 0.98); border: 1px solid rgba(255,121,198,0.5);
+  border-radius: 14px; padding: 24px; width: 420px; max-width: 94vw;
+  font-family: 'JetBrains Mono', monospace; color: #f8f8f2;
+  box-shadow: 0 8px 60px rgba(0,0,0,0.7);
+}
+#commitModalBox h4 { color: #ff79c6; margin-bottom: 14px; font-size: 13px; }
+#commitModalBox .cm-label { color: #6272a4; font-size: 10px; margin-bottom: 6px; }
+#commitMsgInput {
+  width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,121,198,0.3);
+  color: #f8f8f2; padding: 8px 12px; border-radius: 8px;
+  font: 11px 'JetBrains Mono', monospace; outline: none; resize: vertical; min-height: 60px;
+}
+#commitMsgInput:focus { border-color: #ff79c6; }
+#commitModalBox .cm-row { display: flex; gap: 8px; margin-top: 14px; justify-content: flex-end; }
+.cm-btn {
+  background: rgba(0,0,0,0.5); border: 1px solid rgba(255,121,198,0.4);
+  color: #ff79c6; padding: 7px 18px; border-radius: 7px;
+  font: 700 10px 'JetBrains Mono', monospace; cursor: pointer; transition: all 0.15s;
+}
+.cm-btn:hover { background: rgba(255,121,198,0.15); }
+.cm-btn.cancel { border-color: #6272a4; color: #6272a4; }
+.cm-btn.cancel:hover { background: rgba(98,114,164,0.15); }
+
+/* ── PWA Install Banner ── */
+#pwaInstallBanner {
+  position: fixed; top: 0; left: 0; width: 100%; z-index: 9999;
+  background: rgba(0, 4, 50, 0.97); border-bottom: 1px solid rgba(0,255,136,0.3);
+  padding: 8px 16px; display: none; align-items: center; justify-content: space-between;
+  gap: 10px; backdrop-filter: blur(14px);
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #00ff88;
+}
+#pwaInstallBanner.visible { display: flex; }
+#pwaInstallBtn {
+  background: rgba(0,255,136,0.15); border: 1px solid #00ff88; color: #00ff88;
+  padding: 5px 14px; border-radius: 6px; font: 700 10px 'JetBrains Mono', monospace;
+  cursor: pointer; white-space: nowrap; transition: all 0.15s;
+}
+#pwaInstallBtn:hover { background: rgba(0,255,136,0.3); }
+#pwaDismissBtn {
+  background: transparent; border: none; color: rgba(0,255,136,0.5);
+  font: 700 14px 'JetBrains Mono', monospace; cursor: pointer; padding: 2px 6px;
+}
+#pwaDismissBtn:hover { color: #00ff88; }
+</style>
+</head>
+<body>
+
+<div id="pwaInstallBanner">
+  <span>⚡ Install AI Compile as an app for offline use</span>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <button id="pwaInstallBtn">📲 Install</button>
+    <button id="pwaDismissBtn">✕</button>
+  </div>
+</div>
+
+<iframe id="preview" sandbox="allow-scripts allow-same-origin allow-modals allow-forms allow-popups"></iframe>
+<textarea id="codeView" spellcheck="false" placeholder="Raw code goes here..."></textarea>
+
+<div id="fring"></div>
+
+<div id="statusBar">
+  <span class="status-item" id="statusLeft">⚡ Standalone Auto-Edition Active</span>
+  <span class="status-item" id="statusRight">📄 Workspace Empty</span>
+</div>
+
+<div id="controlBar">
+  <div id="bottom-controls">
+    <input type="text" id="aiInstruction" class="btn" style="border-color: #f1fa8c; color: #f1fa8c;" placeholder="Instructions for AI...">
+    <button id="payloadBtn" class="btn" style="border-color: #8be9fd; color: #8be9fd;">🚀 Payload</button>
+    <button id="promptBtn" class="btn" style="display: none; border-color: #8be9fd; color: #8be9fd;">🤖 AI Prompt</button>
+    <button id="astBtn" class="btn" style="display: none; border-color: #8be9fd; color: #8be9fd;">🧠 AST Diagnostics</button>
+    <select id="aiSelector" class="btn" style="border-color: #bd93f9; color: #bd93f9; margin-left: 8px;">
+      <option value="">🚀 Launch AI...</option>
+      <option value="https://gemini.google.com/app">Gemini</option>
+      <option value="https://chatgpt.com/">ChatGPT</option>
+      <option value="https://claude.ai/new">Claude</option>
+      <option value="https://www.phind.com/">Phind</option>
+    </select>
+  </div>
+  <div class="ctrl-sep"></div>
+  <div id="controls">
+    <select id="clipHistory" class="btn" style="display: none; border-color: #6272a4; color: #6272a4; max-width: 130px;">
+      <option value="">📋 History</option>
+    </select>
+    <button id="undoBtn" class="btn" style="border-color: #ffb86c; color: #ffb86c;" disabled title="Ctrl+Z">↩ Undo</button>
+    <button id="redoBtn" class="btn" style="border-color: #ffb86c; color: #ffb86c;" disabled title="Ctrl+Y">↪ Redo</button>
+    <button id="pasteProcessBtn" class="btn" style="border-color: #50fa7b; color: #50fa7b;" title="Ctrl+Enter">📋 Paste & Process</button>
+    <button id="revertBtn" class="btn" style="display: none !important; border-color: #ff5555; color: #ff5555;" title="Reload from disk">🔄 Revert</button>
+    <button id="fileBtn" class="btn">🔗 Link File</button>
+    <button id="viewModeBtn" class="btn" style="border-color: #f1fa8c; color: #f1fa8c;" title="Toggle Web Preview / Raw Code">🌐 Web Mode</button>
+  </div>
+  <div class="ctrl-sep"></div>
+  <div id="git-controls">
+    <button id="ghSettingsBtn" title="GitHub Settings">⚙ GH</button>
+    <button id="pushBtn" disabled title="Commit & Push to GitHub">⬆ Push</button>
+  </div>
+</div>
+
+<div id="shortcutBar">
+  <span class="sc-label">⚡ SHORTCUTS</span>
+</div>
+
+<div id="repoBar">
+  <span class="repo-bar-empty">⏳ Loading repos…</span>
+</div>
+
+<div id="ghConfigPanel">
+  <h4>🐙 GitHub Integration</h4>
+  <div class="gh-row">
+    <label>Token</label>
+    <input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+  </div>
+  <div class="gh-hint">Personal Access Token with <strong>repo</strong> scope. Stored locally only.</div>
+  <div class="gh-row">
+    <label>Username</label>
+    <input type="text" id="ghUser" placeholder="your-github-username">
+  </div>
+  <div style="color:#8be9fd; font-size:10px; margin-top:2px;">📁 Repositories (owner/repo)</div>
+  <div class="gh-repo-list" id="ghRepoList"></div>
+  <div class="gh-add-row">
+    <input type="text" id="ghNewRepo" placeholder="owner/repo-name (e.g. you/myapp)">
+    <button class="gh-btn" id="ghAddRepoBtn">+ Add</button>
+  </div>
+  <div class="gh-row" style="margin-top:2px;">
+    <label>Branch</label>
+    <input type="text" id="ghBranch" placeholder="main">
+  </div>
+  <div class="gh-row">
+    <label>File path</label>
+    <input type="text" id="ghFilePath" placeholder="index.html">
+  </div>
+  <div class="gh-hint">File path inside the repo. Default: <code>index.html</code></div>
+  <div class="gh-actions">
+    <button class="gh-btn" id="ghSyncNowBtn">🔄 Sync Repos</button>
+    <button class="gh-btn save" id="ghSaveBtn">💾 Save Settings</button>
+    <button class="gh-btn" id="ghClosePanelBtn">✕ Close</button>
+  </div>
+</div>
+
+<div id="commitModal">
+  <div id="commitModalBox">
+    <h4>⬆ Commit &amp; Push</h4>
+    <div class="cm-label">Commit message</div>
+    <textarea id="commitMsgInput" placeholder="Update index.html via AI Compile"></textarea>
+    <div class="cm-row">
+      <button class="cm-btn cancel" id="cmCancelBtn">✕ Cancel</button>
+      <button class="cm-btn" id="cmConfirmBtn">⬆ Push to GitHub</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="astPanel"><h4>🧠 Local AST Health</h4><div id="astContent">Load a file to analyse.</div></div>
+<div id="errOverlay">
+  <div class="err-header">
+    <span class="err-title">⚠️ PATCH ERROR</span>
+  </div>
+  <div class="err-body" id="errBody"></div>
+  <div class="err-actions">
+    <button class="err-btn copy" id="errCopyBtn">📋 Copy Error</button>
+    <button class="err-btn" id="errDismissBtn">✕ Dismiss</button>
+  </div>
+</div>
+
+<script>
+  // ── PWA Service Worker Registration ──────────────────────────────────
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/Fastest/sw.js', { scope: '/Fastest/' }).then(reg => {
+        console.log('SW registered:', reg.scope);
+        reg.onupdatefound = () => {
+          const installing = reg.installing;
+          if (installing) {
+            installing.onstatechange = () => {
+              if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+                toast('🔄 Update available — refresh to get the latest version');
+              }
+            };
+          }
+        };
+      }).catch(err => console.warn('SW registration failed:', err));
+    });
+  }
+
+  // ── PWA Install Prompt ────────────────────────────────────────────────
+  var _deferredInstallPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    _deferredInstallPrompt = e;
+    const banner = document.getElementById('pwaInstallBanner');
+    if (localStorage.getItem('pwa_install_dismissed') !== 'true') {
+      banner.classList.add('visible');
+    }
+  });
+
+  document.getElementById('pwaInstallBtn').addEventListener('click', async () => {
+    if (!_deferredInstallPrompt) return;
+    _deferredInstallPrompt.prompt();
+    const { outcome } = await _deferredInstallPrompt.userChoice;
+    _deferredInstallPrompt = null;
+    document.getElementById('pwaInstallBanner').classList.remove('visible');
+    if (outcome === 'accepted') toast('✅ AI Compile installed as app!');
+  });
+
+  document.getElementById('pwaDismissBtn').addEventListener('click', () => {
+    document.getElementById('pwaInstallBanner').classList.remove('visible');
+    localStorage.setItem('pwa_install_dismissed', 'true');
+  });
+
+  window.addEventListener('appinstalled', () => {
+    document.getElementById('pwaInstallBanner').classList.remove('visible');
+    toast('✅ App installed successfully!');
+  });
+
+  // ── Main App Code ─────────────────────────────────────────────────────
+  let lastClip = '';
+  let clipHistoryArray = [];
+  let isInternalCopy = false; 
+  let isCodeMode = false;
+  
+  const $pv = document.getElementById('preview');
+  const $codeView = document.getElementById('codeView');
+  const $fring = document.getElementById('fring');
+  const $toast = document.getElementById('toast');
+  
+  let fileHandle = null;
+  let sourceContent = '';
+  let undoStack = [];
+  let redoStack = [];
+  let autoMode = true;
+
+  // ─── GitHub State ───────────────────────────────────────────────────
+  var ghToken = '';
+  var ghUser = '';
+  var ghBranch = 'main';
+  var ghFilePath = 'index.html';
+  var ghRepos = [];
+  var ghCurrentRepo = '';
+
+  function ghApplyCfg(cfg) {
+    if (!cfg) return;
+    ghToken    = cfg.token    || '';
+    ghUser     = cfg.user     || '';
+    ghBranch   = cfg.branch   || 'main';
+    ghFilePath = cfg.filePath || 'index.html';
+    ghRepos    = cfg.repos    || [];
+  }
+
+  function ghLoadConfig() {
+    try {
+      const saved = localStorage.getItem('aicompiler_gh_config');
+      if (saved) ghApplyCfg(JSON.parse(saved));
+    } catch(e) {}
+  }
+
+  async function ghLoadConfigFromFirebase() {
+    try {
+      if (window._fbLoadConfig) {
+        const cfg = await window._fbLoadConfig();
+        if (cfg) {
+          ghApplyCfg(cfg);
+          localStorage.setItem('aicompiler_gh_config', JSON.stringify(cfg));
+        }
+      }
+    } catch(e) {}
+  }
+
+  function ghSaveConfig() {
+    const cfg = { token: ghToken, user: ghUser, branch: ghBranch, filePath: ghFilePath, repos: ghRepos, shortcuts: scShortcuts, scLocked: scLocked };
+    localStorage.setItem('aicompiler_gh_config', JSON.stringify(cfg));
+    if (window._fbSaveConfig) window._fbSaveConfig(cfg).catch(()=>{});
+  }
+
+  function ghBuildDropdown() {
+    const bar = document.getElementById('repoBar');
+    bar.innerHTML = '';
+    if (ghRepos.length === 0) {
+      bar.innerHTML = '<span class="repo-bar-empty">⚠ No repos — open ⚙ GH to add</span>';
+      document.getElementById('pushBtn').disabled = true;
+      return;
+    }
+    let defaultFound = false;
+    ghRepos.forEach(r => {
+      const btn = document.createElement('button');
+      btn.className = 'repo-btn' + (r.isDefault ? ' active' : '');
+      btn.textContent = (r.isDefault ? '★ ' : '') + r.name.split('/').pop();
+      btn.title = r.name + '\n(Drag to shortcut bar to pin)';
+      btn.draggable = true;
+      btn.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', r.name);
+        e.dataTransfer.setData('sc-type', 'repo');
+        btn.style.opacity = '0.5';
+      });
+      btn.addEventListener('dragend', () => { btn.style.opacity = ''; });
+      btn.addEventListener('click', async () => {
+        bar.querySelectorAll('.repo-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        ghRepos.forEach(x => x.isDefault = (x.name === r.name));
+        ghCurrentRepo = r.name;
+        document.getElementById('pushBtn').disabled = false;
+        ghSaveConfig();
+        await ghSyncFromRepo(r.name, false);
+      });
+      bar.appendChild(btn);
+      if (r.isDefault && !defaultFound) {
+        ghCurrentRepo = r.name;
+        defaultFound = true;
+      }
+    });
+    if (!defaultFound && ghRepos.length > 0) {
+      ghCurrentRepo = ghRepos[0].name;
+      bar.querySelector('.repo-btn').classList.add('active');
+    }
+    document.getElementById('pushBtn').disabled = !ghCurrentRepo;
+  }
+
+  function ghRenderRepoPanelList() {
+    const list = document.getElementById('ghRepoList');
+    list.innerHTML = '';
+    ghRepos.forEach((r, idx) => {
+      const row = document.createElement('div');
+      row.className = 'gh-repo-item';
+      row.innerHTML = `
+        <input type="text" value="${r.name}" data-idx="${idx}" class="gh-repo-name-inp" placeholder="owner/repo">
+        <span class="gh-star ${r.isDefault ? 'active' : ''}" data-idx="${idx}" title="Set as default">★</span>
+        <span class="gh-del" data-idx="${idx}" title="Remove">✕</span>
+      `;
+      list.appendChild(row);
+    });
+
+    list.querySelectorAll('.gh-repo-name-inp').forEach(inp => {
+      inp.addEventListener('change', e => {
+        ghRepos[+e.target.dataset.idx].name = e.target.value.trim();
+        ghSaveConfig(); ghBuildDropdown();
+      });
+    });
+    list.querySelectorAll('.gh-star').forEach(star => {
+      star.addEventListener('click', e => {
+        const idx = +e.target.dataset.idx;
+        ghRepos.forEach((r, i) => r.isDefault = (i === idx));
+        ghSaveConfig(); ghRenderRepoPanelList(); ghBuildDropdown();
+        toast('★ Default repo set: ' + ghRepos[idx].name);
+      });
+    });
+    list.querySelectorAll('.gh-del').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const idx = +e.target.dataset.idx;
+        ghRepos.splice(idx, 1);
+        ghSaveConfig(); ghRenderRepoPanelList(); ghBuildDropdown();
+      });
+    });
+  }
+
+  async function ghSyncFromRepo(repoName, silent) {
+    if (!ghToken || !repoName) return;
+    const branch = ghBranch || 'main';
+    const path   = ghFilePath || 'index.html';
+    const url    = `https://api.github.com/repos/${repoName}/contents/${path}?ref=${branch}`;
+    try {
+      if (!silent) toast('🔄 Syncing from GitHub…', 3000);
+      document.getElementById('statusLeft').textContent = `🔄 Syncing ${repoName}…`;
+      const res = await fetch(url, {
+        headers: { Authorization: `token ${ghToken}`, Accept: 'application/vnd.github.v3+json' }
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(()=>({}));
+        if (!silent) toast(`❌ Sync failed: ${errData.message || res.status}`);
+        document.getElementById('statusLeft').textContent = `❌ Sync failed (${res.status})`;
+        return;
+      }
+      const data = await res.json();
+      const binary = atob(data.content.replace(/\s/g, ''));
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const decoded = new TextDecoder('utf-8').decode(bytes);
+      sourceContent = decoded;
+      render(sourceContent);
+      document.getElementById('statusLeft').textContent = `✅ Synced: ${repoName}`;
+      if (!silent) toast(`✅ Loaded ${path} from ${repoName}`);
+    } catch(e) {
+      if (!silent) toast('❌ Sync error: ' + e.message);
+      document.getElementById('statusLeft').textContent = '❌ Sync error';
+    }
+  }
+
+  async function ghFetchAllRepos() {
+    if (!ghToken || !ghUser) return;
+    try {
+      document.getElementById('statusLeft').textContent = '🔄 Fetching repos…';
+      let page = 1, fetched = [];
+      while (true) {
+        const res = await fetch(`https://api.github.com/user/repos?per_page=100&page=${page}&sort=updated`, {
+          headers: { Authorization: `token ${ghToken}`, Accept: 'application/vnd.github.v3+json' }
+        });
+        if (!res.ok) break;
+        const data = await res.json();
+        if (!data.length) break;
+        fetched = fetched.concat(data.map(r => r.full_name));
+        if (data.length < 100) break;
+        page++;
+      }
+      if (!fetched.length) return;
+      const existingNames = ghRepos.map(r => r.name);
+      fetched.forEach(name => {
+        if (!existingNames.includes(name)) {
+          ghRepos.push({ name, isDefault: false });
+        }
+      });
+      ghSaveConfig();
+      ghBuildDropdown();
+      document.getElementById('statusLeft').textContent = `✅ Synced: ${ghCurrentRepo} · ${fetched.length} repos`;
+    } catch(e) {
+      document.getElementById('statusLeft').textContent = '❌ Repo fetch error';
+    }
+  }
+
+  document.getElementById('ghSettingsBtn').addEventListener('click', () => {
+    const panel = document.getElementById('ghConfigPanel');
+    const isOpen = panel.classList.contains('open');
+    if (isOpen) {
+      panel.classList.remove('open');
+      document.getElementById('ghSettingsBtn').classList.remove('active');
+    } else {
+      document.getElementById('ghToken').value    = ghToken;
+      document.getElementById('ghUser').value     = ghUser;
+      document.getElementById('ghBranch').value   = ghBranch;
+      document.getElementById('ghFilePath').value = ghFilePath;
+      ghRenderRepoPanelList();
+      panel.classList.add('open');
+      document.getElementById('ghSettingsBtn').classList.add('active');
+    }
+  });
+
+  document.getElementById('ghClosePanelBtn').addEventListener('click', () => {
+    document.getElementById('ghConfigPanel').classList.remove('open');
+    document.getElementById('ghSettingsBtn').classList.remove('active');
+  });
+
+  document.getElementById('ghSaveBtn').addEventListener('click', () => {
+    ghToken    = document.getElementById('ghToken').value.trim();
+    ghUser     = document.getElementById('ghUser').value.trim();
+    ghBranch   = document.getElementById('ghBranch').value.trim() || 'main';
+    ghFilePath = document.getElementById('ghFilePath').value.trim() || 'index.html';
+    ghSaveConfig();
+    ghBuildDropdown();
+    toast('💾 GitHub settings saved!');
+  });
+
+  document.getElementById('ghAddRepoBtn').addEventListener('click', () => {
+    const val = document.getElementById('ghNewRepo').value.trim();
+    if (!val || !val.includes('/')) { toast('❌ Use format: owner/repo'); return; }
+    if (ghRepos.find(r => r.name === val)) { toast('ℹ Repo already in list'); return; }
+    const isFirst = ghRepos.length === 0;
+    ghRepos.push({ name: val, isDefault: isFirst });
+    document.getElementById('ghNewRepo').value = '';
+    ghSaveConfig(); ghRenderRepoPanelList(); ghBuildDropdown();
+    toast('✅ Repo added' + (isFirst ? ' (set as default)' : ''));
+  });
+
+  document.getElementById('ghSyncNowBtn').addEventListener('click', async () => {
+    ghToken    = document.getElementById('ghToken').value.trim();
+    ghUser     = document.getElementById('ghUser').value.trim();
+    ghBranch   = document.getElementById('ghBranch').value.trim() || 'main';
+    ghFilePath = document.getElementById('ghFilePath').value.trim() || 'index.html';
+    ghSaveConfig();
+    await ghFetchAllRepos();
+    ghRenderRepoPanelList();
+    toast('✅ Repos synced from GitHub!');
+  });
+
+  document.getElementById('pushBtn').addEventListener('click', () => {
+    if (!sourceContent) { toast('❌ Nothing to push — load content first'); return; }
+    if (!ghToken)        { toast('❌ GitHub token not set — open ⚙ GH settings'); return; }
+    if (!ghCurrentRepo)  { toast('❌ No repo selected'); return; }
+    const ts = new Date().toISOString().replace('T',' ').slice(0,19);
+    document.getElementById('commitMsgInput').value = `Update ${ghFilePath || 'index.html'} via AI Compile — ${ts}`;
+    document.getElementById('commitModal').classList.add('open');
+  });
+
+  document.getElementById('cmCancelBtn').addEventListener('click', () => {
+    document.getElementById('commitModal').classList.remove('open');
+  });
+
+  document.getElementById('cmConfirmBtn').addEventListener('click', async () => {
+    const msg = document.getElementById('commitMsgInput').value.trim();
+    if (!msg) { toast('❌ Enter a commit message'); return; }
+    document.getElementById('commitModal').classList.remove('open');
+    await ghPushFile(msg);
+  });
+
+  async function ghGetFileSHA(repoName, path, branch) {
+    const url = `https://api.github.com/repos/${repoName}/contents/${path}?ref=${branch}`;
+    try {
+      const res = await fetch(url, {
+        headers: { Authorization: `token ${ghToken}`, Accept: 'application/vnd.github.v3+json' }
+      });
+      if (res.status === 404) return null;
+      const data = await res.json();
+      return data.sha || null;
+    } catch(e) { return null; }
+  }
+
+  async function ghPushFile(commitMsg) {
+    const btn = document.getElementById('pushBtn');
+    btn.classList.add('pushing');
+    btn.disabled = true;
+    const branch   = ghBranch   || 'main';
+    const filePath = ghFilePath || 'index.html';
+    const repo     = ghCurrentRepo;
+
+    try {
+      toast('⬆ Pushing to GitHub…', 4000);
+      document.getElementById('statusLeft').textContent = `⬆ Pushing to ${repo}…`;
+
+      const sha = await ghGetFileSHA(repo, filePath, branch);
+      const encoded = btoa(unescape(encodeURIComponent(sourceContent)));
+
+      const body = { message: commitMsg, content: encoded, branch: branch };
+      if (sha) body.sha = sha;
+
+      const res = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `token ${ghToken}`,
+          Accept: 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        document.getElementById('statusLeft').textContent = `✅ Pushed to ${repo}`;
+        toast(`✅ Pushed! SHA: ${data.content?.sha?.slice(0,7) || 'ok'}`);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        document.getElementById('statusLeft').textContent = `❌ Push failed`;
+        toast(`❌ Push failed: ${err.message || res.status}`);
+      }
+    } catch(e) {
+      document.getElementById('statusLeft').textContent = '❌ Push error';
+      toast('❌ Push error: ' + e.message);
+    } finally {
+      btn.classList.remove('pushing');
+      btn.disabled = false;
+    }
+  }
+
+  // ─── Original App Code ────────────────────────────────────────────────
+  const SUPER_PROMPT = `[Give me the results as Combined Find-and-Replace blocks. Put the old code and the new code inside a single code block separated by exactly ===SPLIT=== on its own line so I only have to click 'copy' once. 
+(Note: This works for ANY language. Ignore JS-specific scope rules if not applicable.)
+The 11 Surgery Scenarios You Must Handle:
+Scenario 1 (The Swap): Just changing one value or line for another.
+Scenario 2 (The Excision): Deleting code while keeping the rest of the file clean.
+Scenario 3 (The Injection): "Bolting on" brand new features to existing code.
+Scenario 4 (The Interceptor): Adding a safety check or a rule inside an existing process.
+Scenario 5 (The Migration): Moving a button or a piece of logic from one place to another.
+Scenario 6 (The Refactor): Rewriting a complex math formula or a loop to make it faster.
+Scenario 7 (The Sweep): Renaming a specific word/variable everywhere it appears.
+Scenario 8 (The Database Bump): Updating saved data settings so the app doesn't crash on old info.
+Scenario 9 (The Link Shift): Changing where the app connects to (APIs, URLs, or Tokens).
+Scenario 10 (The Sync): If you change the "Brain" (Web Worker), you must also fix the "Body" (Main Script).
+Scenario 11 (The Layer Fix): Fixing UI issues where things are hidden or unclickable.
+If any variable is declared with const or let inside a function or block that gets re-executed, move the declaration outside to the top of the script or convert it to var. Never declare the same identifier twice in the same scope.
+response must contain ONLY the code blocks. No warnings, no error messages, no annotations.
+If you have a concern about the existing code, state it in plain text BEFORE the code block — never inside it.
+Before you give me the solution, double-check that you haven't left any brackets } or parentheses ) unclosed.
+For multiple independent fixes, separate each OLD===SPLIT===NEW pair with ===BLOCK=== so I can batch-apply all at once with one copy.]`;
+
+  window.addEventListener('load', async () => {
+    ghLoadConfig();
+    ghBuildDropdown();
+
+    let fbWait = 0;
+    while (!window._fbReady && fbWait < 20) { await new Promise(r => setTimeout(r, 50)); fbWait++; }
+    await ghLoadConfigFromFirebase();
+    await scLoadFromFirebase();
+    scRender();
+
+    const DEFAULT_REPO = '888znq/TNL';
+    if (!ghRepos.find(r => r.name === DEFAULT_REPO)) {
+      ghRepos.unshift({ name: DEFAULT_REPO, isDefault: true });
+    }
+    if (!ghRepos.find(r => r.isDefault)) {
+      const tnl = ghRepos.find(r => r.name === DEFAULT_REPO);
+      if (tnl) tnl.isDefault = true;
+    }
+    ghBuildDropdown();
+
+    const defaultRepo = ghRepos.find(r => r.isDefault) || ghRepos[0];
+    const repoToSync  = defaultRepo ? defaultRepo.name : '';
+    if (repoToSync && ghToken) {
+      ghCurrentRepo = repoToSync;
+      document.getElementById('pushBtn').disabled = false;
+      await ghSyncFromRepo(repoToSync, false);
+    } else {
+      const saved = localStorage.getItem('aicompiler_source');
+      if (saved && !sourceContent) {
+        sourceContent = saved;
+        render(sourceContent);
+        toast("💾 Restored previous session");
+      }
+    }
+
+    if (ghToken && ghUser) ghFetchAllRepos();
+
+    startClipboardPolling();
+
+    if (location.protocol === 'https:') {
+      try {
+        const perm = await navigator.permissions.query({ name: 'clipboard-read' });
+        if (!repoToSync || !ghToken) {
+          if (perm.state === 'granted') {
+            document.getElementById('statusLeft').textContent = '⚡ Clipboard Ready';
+          } else if (perm.state === 'prompt') {
+            document.getElementById('statusLeft').textContent = '📋 Click "Paste & Process" to allow clipboard';
+          }
+        }
+        perm.onchange = () => {
+          if (perm.state === 'granted') document.getElementById('statusLeft').textContent = '⚡ Clipboard Ready';
+          else document.getElementById('statusLeft').textContent = '📋 Clipboard permission removed';
+        };
+      } catch(e) {}
+    }
+  });
+
+  $codeView.addEventListener('input', (e) => {
+    if (!isCodeMode) return;
+    sourceContent = e.target.value;
+    localStorage.setItem('aicompiler_source', sourceContent);
+    if (fileHandle) nativeSilentSave(sourceContent);
+    updateStatusBar();
+  });
+
+  document.getElementById('viewModeBtn').addEventListener('click', (e) => {
+    isCodeMode = !isCodeMode;
+    if (isCodeMode) {
+      e.target.textContent = '🐍 Code Mode';
+      e.target.style.borderColor = '#50fa7b';
+      e.target.style.color = '#50fa7b';
+      $pv.style.display = 'none';
+      $codeView.style.display = 'block';
+    } else {
+      e.target.textContent = '🌐 Web Mode';
+      e.target.style.borderColor = '#f1fa8c';
+      e.target.style.color = '#f1fa8c';
+      $pv.style.display = 'block';
+      $codeView.style.display = 'none';
+    }
+    render(sourceContent);
+    toast(isCodeMode ? "🐍 Code Mode Active" : "🌐 Web Mode Active");
+  });
+
+  const $errOverlay = document.getElementById('errOverlay');
+  const $errBody    = document.getElementById('errBody');
+  let _lastErrMsg   = '';
+
+  function showErr(msg) {
+    _lastErrMsg = msg;
+    $errBody.textContent = msg;
+    $errOverlay.style.display = 'block';
+  }
+
+  document.getElementById('errCopyBtn').addEventListener('click', async () => {
+    try {
+      const report = `PATCH ERROR — please fix and resend the patch.\n\nError: ${_lastErrMsg}\n\nCurrent source:\n${sourceContent}`;
+      await navigator.clipboard.writeText(report);
+      document.getElementById('errCopyBtn').textContent = '✅ Copied!';
+      setTimeout(() => { document.getElementById('errCopyBtn').textContent = '📋 Copy Error'; }, 2000);
+    } catch(e) { toast("❌ Copy failed"); }
+  });
+
+  document.getElementById('errDismissBtn').addEventListener('click', () => {
+    $errOverlay.style.display = 'none';
+  });
+
+  window.addEventListener('message', (e) => {
+    if (e.data && e.data.__compilerErr) showErr(e.data.__compilerErr);
+  });
+
+  const $astPanel = document.getElementById('astPanel');
+  const $astContent = document.getElementById('astContent');
+
+  document.getElementById('astBtn').addEventListener('click', () => {
+    $astPanel.style.display = $astPanel.style.display === 'block' ? 'none' : 'block';
+    if ($astPanel.style.display === 'block' && sourceContent) runASTCheck(sourceContent);
+  });
+
+  document.getElementById('aiSelector').addEventListener('change', (e) => {
+    const aiUrl = e.target.value;
+    if (!aiUrl) return;
+    window.open(aiUrl, '_blank');
+    toast("🚀 Launching AI Tab...");
+    e.target.value = ""; 
+  });
+
+  document.getElementById('payloadBtn').addEventListener('click', async () => {
+    const instruction = document.getElementById('aiInstruction').value.trim();
+    let payload = SUPER_PROMPT + "\n\n";
+    if (instruction) payload += "=== INSTRUCTIONS ===\n" + instruction + "\n\n";
+    payload += "=== CURRENT SOURCE ===\n" + (sourceContent ? sourceContent : "(No source loaded)");
+    try {
+        isInternalCopy = true;
+        await navigator.clipboard.writeText(payload);
+        setTimeout(() => { isInternalCopy = false; }, 1500);
+        toast("🚀 Payload Copied!");
+    } catch (err) { toast("❌ Failed to copy payload"); }
+  });
+
+  function updateStatusBar() {
+    const lines = sourceContent ? sourceContent.split('\n').length : 0;
+    const name = fileHandle ? fileHandle.name : (sourceContent ? (ghCurrentRepo || 'Memory') : 'Empty');
+    document.getElementById('statusRight').textContent = `📄 ${name} · ${lines} lines · ↩ ${undoStack.length} | ↪ ${redoStack.length}`;
+  }
+
+  function runASTCheck(src) {
+    if (isCodeMode) {
+       $astContent.innerHTML = '<span class="ast-warn">⚠️ AST Check is bypassed in Code Mode.</span>';
+       return;
+    }
+    const results = [];
+    const brackets = { '{': 0, '(': 0, '[': 0 };
+    const closers  = { '}': '{', ')': '(', ']': '[' };
+    let inStr = false, strChar = '', inTempl = 0;
+    for (let i = 0; i < src.length; i++) {
+      const ch = src[i];
+      if (inStr) { if (ch === '\\') { i++; continue; } if (ch === strChar) inStr = false; continue; }
+      if (ch === '`') { inTempl = inTempl ? 0 : 1; continue; }
+      if (inTempl) continue;
+      if (ch === '"' || ch === "'") { inStr = true; strChar = ch; continue; }
+      if (ch === '/' && src[i+1] === '/') { while (i < src.length && src[i] !== '\n') i++; continue; }
+      if (ch === '/' && src[i+1] === '*') { i+=2; while (i < src.length-1 && !(src[i]==='*'&&src[i+1]==='/')) i++; i++; continue; }
+      if (brackets[ch] !== undefined) brackets[ch]++;
+      if (closers[ch]) brackets[closers[ch]]--;
+    }
+    const bOpen = Object.entries(brackets).filter(([,v]) => v !== 0);
+    results.push(bOpen.length === 0
+      ? '<span class="ast-ok">✅ Brackets balanced</span>'
+      : bOpen.map(([k,v]) => `<span class="ast-err">❌ Unbalanced '${k}': ${v>0?'+'+v+' unclosed':Math.abs(v)+' extra'}</span>`).join('<br>'));
+
+    const tagCounts = {};
+    const selfClose = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr']);
+    const tagRe = /<\/?([a-zA-Z][a-zA-Z0-9]*)(?=[\s>])[^>]*>/g;
+    let tm;
+    while ((tm = tagRe.exec(src)) !== null) {
+      const tag = tm[1].toLowerCase();
+      if (selfClose.has(tag)) continue;
+      tagCounts[tag] = (tagCounts[tag]||0) + (tm[0].startsWith('</') ? -1 : 1);
+    }
+    const unbalTags = Object.entries(tagCounts).filter(([,v]) => v !== 0);
+    results.push(unbalTags.length === 0
+      ? '<span class="ast-ok">✅ HTML tags balanced</span>'
+      : unbalTags.slice(0,5).map(([t,v]) => `<span class="ast-err">❌ &lt;${t}&gt;: ${v>0?v+' unclosed':Math.abs(v)+' extra'}</span>`).join('<br>'));
+
+    let cssOpen = 0;
+    [...src.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].forEach(m => {
+      for (const ch of m[1]) { if (ch==='{') cssOpen++; else if (ch==='}') cssOpen--; }
+    });
+    results.push(cssOpen === 0
+      ? '<span class="ast-ok">✅ CSS braces balanced</span>'
+      : `<span class="ast-err">❌ CSS braces: ${cssOpen>0?cssOpen+' unclosed {':Math.abs(cssOpen)+' extra }'}</span>`);
+
+    results.push(`<span style="color:#6272a4">📏 ${src.split('\n').length} lines | ${(src.length/1024).toFixed(1)} KB</span>`);
+    $astContent.innerHTML = results.join('<br>');
+  }
+
+  function astGuardAfterApply() {
+    if (isCodeMode) return true;
+    if (!sourceContent) return true;
+    const src = sourceContent;
+    const counts = { '{': 0, '(': 0, '[': 0 };
+    const cl = { '}': '{', ')': '(', ']': '[' };
+    let ins = false, ic = '', it = 0;
+    for (let i = 0; i < src.length; i++) {
+      const c = src[i];
+      if (ins) { if (c === '\\') { i++; continue; } if (c === ic) ins = false; continue; }
+      if (c === '`') { it = it ? 0 : 1; continue; }
+      if (it) continue;
+      if (c === '"' || c === "'") { ins = true; ic = c; continue; }
+      if (c === '/' && src[i+1] === '/') { while (i < src.length && src[i] !== '\n') i++; continue; }
+      if (counts[c] !== undefined) counts[c]++;
+      if (cl[c]) counts[cl[c]]--;
+    }
+    const broken = Object.entries(counts).filter(([,v]) => v !== 0);
+    if (broken.length > 0) {
+      const msg = broken.map(([k,v]) => `'${k}' ${v>0?v+' unclosed':Math.abs(v)+' extra'}`).join(', ');
+      showErr(`AST Guard: ${msg} — auto-undoing`);
+      if (undoStack.length > 0) {
+          redoStack.push(sourceContent);
+          document.getElementById('redoBtn').disabled = false;
+          sourceContent = undoStack.pop();
+          if (undoStack.length === 0) document.getElementById('undoBtn').disabled = true;
+          render(sourceContent);
+          if (fileHandle) nativeSilentSave(sourceContent);
+          toast('🛡️ AST Guard: auto-undone!', 4000);
+      }
+      return false;
+    }
+    if ($astPanel.style.display === 'block') runASTCheck(sourceContent);
+    return true;
+  }
+
+  function parseAllBlocks(text) {
+    const cleaned = text.replace(/\/\/\s*(OLD|NEW)\s*CHUNK\s*/gi, '').trim();
+    const stripped = cleaned.replace(/^```[\w]*\n?/gm, '').replace(/^```$/gm, '').trim();
+    const units = stripped.split(/={3}BLOCK={3}/i).map(u => u.trim()).filter(Boolean);
+    if (units.length > 1) {
+      return units.map(u => {
+        if (!u.includes('===SPLIT===')) return null;
+        const idx = u.indexOf('===SPLIT===');
+        return { oldCode: u.slice(0, idx).trim(), newCode: u.slice(idx+11).trim() };
+      }).filter(Boolean);
+    }
+    const single = parseSmartBlock(stripped);
+    return single ? [single] : [];
+  }
+
+  function flash() {
+    $fring.classList.add('on');
+    setTimeout(() => $fring.classList.remove('on'), 400);
+  }
+
+  function toast(msg, duration) {
+    if (duration === undefined) duration = 2500;
+    $toast.textContent = msg;
+    $toast.classList.add('show');
+    setTimeout(() => $toast.classList.remove('show'), duration);
+  }
+
+  document.getElementById('promptBtn').addEventListener('click', async () => {
+    try {
+      isInternalCopy = true;
+      await navigator.clipboard.writeText(SUPER_PROMPT);
+      setTimeout(() => { isInternalCopy = false; }, 1500);
+      toast("🤖 Prompt Copied to Clipboard!");
+    } catch (err) { toast("❌ Failed to copy prompt."); }
+  });
+
+  function pushState() {
+    if (sourceContent) {
+      undoStack.push(sourceContent);
+      if (undoStack.length > 20) undoStack.shift();
+      redoStack = [];
+      document.getElementById('undoBtn').disabled = false;
+      document.getElementById('redoBtn').disabled = true;
+      updateStatusBar();
+    }
+  }
+
+  document.getElementById('undoBtn').addEventListener('click', async () => {
+    if (undoStack.length === 0) return;
+    redoStack.push(sourceContent);
+    sourceContent = undoStack.pop();
+    if (undoStack.length === 0) document.getElementById('undoBtn').disabled = true;
+    document.getElementById('redoBtn').disabled = false;
+    render(sourceContent);
+    if (fileHandle) await nativeSilentSave(sourceContent);
+    toast("↩ Undo applied.");
+  });
+  
+  document.getElementById('redoBtn').addEventListener('click', async () => {
+    if (redoStack.length === 0) return;
+    undoStack.push(sourceContent);
+    sourceContent = redoStack.pop();
+    if (redoStack.length === 0) document.getElementById('redoBtn').disabled = true;
+    document.getElementById('undoBtn').disabled = false;
+    render(sourceContent);
+    if (fileHandle) await nativeSilentSave(sourceContent);
+    toast("↪ Redo applied.");
+  });
+
+  var renderTimer;
+  function render(src) {
+    clearTimeout(renderTimer);
+    renderTimer = setTimeout(() => {
+      localStorage.setItem('aicompiler_source', src);
+      if (isCodeMode) {
+          $codeView.value = src;
+          flash();
+          updateStatusBar();
+      } else {
+          try {
+            const bridge = `<script>
+window.onerror = function(msg,src,line,col,err){ window.parent.postMessage({__compilerErr: 'Line '+line+': '+msg},'*'); return true; };
+window.addEventListener('unhandledrejection',function(e){ window.parent.postMessage({__compilerErr:'Unhandled promise: '+(e.reason||'unknown')},'*'); });
+<\/script>`;
+            $pv.srcdoc = bridge + src;
+          } catch(e) {}
+          flash();
+          updateStatusBar();
+      }
+    }, 100);
+  }
+
+  async function nativeSilentSave(newContent) {
+    if (!fileHandle) return;
+    try {
+      const writable = await fileHandle.createWritable();
+      await writable.write(newContent);
+      await writable.close();
+    } catch (err) {
+      console.warn("Silent save failed - check permissions.");
+    }
+  }
+
+  document.getElementById('fileBtn').addEventListener('click', async () => {
+    try {
+      [fileHandle] = await window.showOpenFilePicker();
+      const file = await fileHandle.getFile();
+      sourceContent = (await file.text()).replace(/\r\n/g, '\n');
+      document.getElementById('fileBtn').textContent = `📄 ${file.name}`;
+      document.getElementById('revertBtn').style.display = 'inline-block';
+      undoStack = []; redoStack = [];
+      document.getElementById('undoBtn').disabled = true;
+      document.getElementById('redoBtn').disabled = true;
+      render(sourceContent);
+      toast(`🔗 Linked & Loaded: ${file.name}`);
+    } catch (err) {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = '*';
+      inp.onchange = async (ev) => {
+        const f = ev.target.files[0]; if (!f) return;
+        sourceContent = (await f.text()).replace(/\r\n/g, '\n');
+        fileHandle = null; 
+        document.getElementById('fileBtn').textContent = `📄 ${f.name}`;
+        document.getElementById('revertBtn').style.display = 'inline-block';
+        undoStack = []; redoStack = [];
+        document.getElementById('undoBtn').disabled = true;
+        document.getElementById('redoBtn').disabled = true;
+        render(sourceContent);
+        toast(`🔗 Loaded: ${f.name} (Save disabled)`);
+      };
+      inp.click();
+    }
+  });
+
+  document.getElementById('revertBtn').addEventListener('click', async () => {
+    if (!fileHandle) { toast("❌ Revert requires an active file link"); return; }
+    try {
+      const file = await fileHandle.getFile();
+      sourceContent = (await file.text()).replace(/\r\n/g, '\n');
+      undoStack = []; redoStack = [];
+      document.getElementById('undoBtn').disabled = true;
+      document.getElementById('redoBtn').disabled = true;
+      render(sourceContent);
+      toast("🔄 Reverted to disk version");
+    } catch(e) { toast("❌ Revert failed"); }
+  });
+
+  function findFingerprintedChunk(source, chunk) {
+    const buildResult = (startIdx, matchedText, isFuzzy) => {
+      const lineStartIdx = source.lastIndexOf('\n', startIdx - 1) + 1;
+      const leadingSpace = source.substring(lineStartIdx, startIdx).match(/^[ \t]*/)[0];
+      const conf = Math.round((Math.min(chunk.length, matchedText.length) / Math.max(chunk.length, matchedText.length)) * 100);
+      return { originalText: matchedText, startIndex: startIdx, endIndex: startIdx + matchedText.length, baseIndent: leadingSpace, confidence: conf, isFuzzy: isFuzzy };
+    };
+
+    const literalIdx = source.indexOf(chunk);
+    if (literalIdx !== -1) {
+      const second = source.indexOf(chunk, literalIdx + 1);
+      if (second === -1) return buildResult(literalIdx, chunk, false);
+      const result = buildResult(literalIdx, chunk, false);
+      result.ambiguous = true;
+      return result;
+    }
+
+    try {
+      const escaped = chunk.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+      const allMatches = [...source.matchAll(new RegExp(escaped, 'g'))];
+      if (allMatches.length === 0) return null;
+      if (allMatches.length === 1) return buildResult(allMatches[0].index, allMatches[0][0], true);
+      const result = buildResult(allMatches[0].index, allMatches[0][0], true);
+      result.ambiguous = true;
+      return result;
+    } catch(e) { return null; }
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key.toLowerCase() === 'z') { e.preventDefault(); document.getElementById('undoBtn').click(); }
+    else if (e.ctrlKey && e.key.toLowerCase() === 'y') { e.preventDefault(); document.getElementById('redoBtn').click(); }
+    else if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); document.getElementById('pasteProcessBtn').click(); }
+  });
+
+  document.getElementById('pasteProcessBtn').addEventListener('click', async () => {
+    let text = '';
+    try {
+      text = await navigator.clipboard.readText();
+    } catch(e) {
+      toast("❌ Clipboard read failed");
+      return;
+    }
+
+    if (!text) { toast("❌ Clipboard is empty"); return; }
+    if (text === SUPER_PROMPT || (sourceContent && text === sourceContent)) { toast("ℹ️ Nothing new to apply"); return; }
+
+    lastClip = text;
+    addToHistory(text);
+
+    if (!sourceContent) {
+      if (isCodeMode || text.includes('<html')) {
+        sourceContent = text;
+        render(text);
+        toast("⚡ Auto-Loaded Source");
+      } else {
+        toast("❌ Load a source file first");
+      }
+      return;
+    }
+
+    const blocks = parseAllBlocks(text);
+    if (blocks.length > 0) {
+      let allOk = true;
+      for (let bi = blocks.length - 1; bi >= 0; bi--) {
+        const applied = await autoLockAndApply(blocks[bi]);
+        if (!applied) { allOk = false; break; }
+      }
+      if (allOk) toast(blocks.length > 1 ? `✨ Batch: ${blocks.length} patches applied!` : `✨ Applied!`);
+    } else {
+      toast("❌ No valid chunks found");
+    }
+  });
+
+  // ─── Shortcut Bar ────────────────────────────────────────────────────
+  var scShortcuts = [];
+  var scLocked = false;
+
+  function scLoad() {
+    try {
+      const saved = localStorage.getItem('aicompiler_shortcuts');
+      if (saved) scShortcuts = JSON.parse(saved);
+      scLocked = localStorage.getItem('aicompiler_sc_locked') === 'true';
+    } catch(e) { scShortcuts = []; }
+  }
+
+  function scSave() {
+    localStorage.setItem('aicompiler_shortcuts', JSON.stringify(scShortcuts));
+    localStorage.setItem('aicompiler_sc_locked', String(scLocked));
+    ghSaveConfig();
+  }
+
+  async function scLoadFromFirebase() {
+    try {
+      if (window._fbLoadConfig) {
+        const cfg = await window._fbLoadConfig();
+        if (cfg) {
+          if (cfg.shortcuts) {
+            scShortcuts = cfg.shortcuts;
+            localStorage.setItem('aicompiler_shortcuts', JSON.stringify(scShortcuts));
+          }
+          if (typeof cfg.scLocked !== 'undefined') {
+            scLocked = cfg.scLocked;
+            localStorage.setItem('aicompiler_sc_locked', String(scLocked));
+          }
+        }
+      }
+    } catch(e) {}
+  }
+
+  function scRender() {
+    const bar = document.getElementById('shortcutBar');
+    bar.innerHTML = '<span class="sc-label">⚡</span>';
+
+    bar.ondragover = (e) => {
+      if (scLocked) return;
+      e.preventDefault();
+      bar.style.boxShadow = 'inset 0 0 0 2px #ffb86c';
+    };
+    bar.ondragleave = () => { bar.style.boxShadow = ''; };
+    bar.ondrop = (e) => {
+      if (scLocked) return;
+      e.preventDefault();
+      bar.style.boxShadow = '';
+      const type = e.dataTransfer.getData('sc-type');
+      const val  = e.dataTransfer.getData('text/plain');
+      if (!val) return;
+
+      if (type === 'repo') {
+        const label = val.split('/').pop();
+        const url   = `https://github.com/${val}`;
+        if (scShortcuts.find(s => s.label === label && s.url === url)) {
+          toast('ℹ Already pinned: ' + label); return;
+        }
+        scShortcuts.push({ label, url });
+        scSave(); scRender();
+        toast('📌 Pinned: ' + label);
+      } else if (type === 'sc-reorder') {
+        const fromIdx = +val;
+        const buttons = [...bar.querySelectorAll('.sc-btn')];
+        let toIdx = scShortcuts.length;
+        for (let i = 0; i < buttons.length; i++) {
+          const r = buttons[i].getBoundingClientRect();
+          if (e.clientX < r.left + r.width / 2) { toIdx = i; break; }
+        }
+        if (fromIdx !== toIdx && fromIdx !== toIdx - 1) {
+          const [item] = scShortcuts.splice(fromIdx, 1);
+          const insertAt = toIdx > fromIdx ? toIdx - 1 : toIdx;
+          scShortcuts.splice(insertAt, 0, item);
+          scSave(); scRender();
+        }
+      }
+    };
+
+    scShortcuts.forEach((sc, idx) => {
+      const wrap = document.createElement('span');
+      wrap.style.cssText = 'display:inline-flex;align-items:center;gap:2px;flex-shrink:0;';
+
+      const btn = document.createElement('button');
+      btn.className = 'sc-btn';
+      btn.textContent = sc.label;
+      btn.title = sc.url + (!scLocked ? '\n(Drag to reorder · click ✕ to remove)' : '');
+      btn.draggable = !scLocked;
+      btn.addEventListener('dragstart', (e) => {
+        if (scLocked) { e.preventDefault(); return; }
+        e.dataTransfer.setData('text/plain', String(idx));
+        e.dataTransfer.setData('sc-type', 'sc-reorder');
+        btn.style.opacity = '0.4';
+      });
+      btn.addEventListener('dragend', () => { btn.style.opacity = ''; });
+      btn.addEventListener('click', async () => {
+        bar.querySelectorAll('.sc-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const ghMatch = sc.url.match(/^https:\/\/github\.com\/([^/]+\/[^/]+)\/?$/);
+        if (ghMatch) {
+          const repoName = ghMatch[1];
+          document.querySelectorAll('#repoBar .repo-btn').forEach(b => b.classList.remove('active'));
+          const matchingRepo = [...document.querySelectorAll('#repoBar .repo-btn')]
+            .find(b => b.title.startsWith(repoName));
+          if (matchingRepo) matchingRepo.classList.add('active');
+          ghRepos.forEach(x => x.isDefault = (x.name === repoName));
+          ghCurrentRepo = repoName;
+          document.getElementById('pushBtn').disabled = false;
+          ghSaveConfig();
+          await ghSyncFromRepo(repoName, false);
+        } else {
+          window.open(sc.url, '_blank');
+          setTimeout(() => btn.classList.remove('active'), 800);
+        }
+      });
+      wrap.appendChild(btn);
+
+      if (!scLocked) {
+        const del = document.createElement('button');
+        del.textContent = '✕';
+        del.title = 'Remove ' + sc.label;
+        del.style.cssText = `
+          background: rgba(255,85,85,0.12); border: 1px solid rgba(255,85,85,0.3);
+          color: #ff5555; padding: 3px 5px; border-radius: 5px;
+          font: 700 9px/1 'JetBrains Mono',monospace;
+          cursor: pointer; flex-shrink: 0; transition: all 0.15s;
+        `;
+        del.addEventListener('mouseenter', () => { del.style.background = 'rgba(255,85,85,0.28)'; });
+        del.addEventListener('mouseleave', () => { del.style.background = 'rgba(255,85,85,0.12)'; });
+        del.addEventListener('click', () => {
+          scShortcuts.splice(idx, 1);
+          scSave(); scRender();
+          toast('🗑 Removed: ' + sc.label);
+        });
+        wrap.appendChild(del);
+      }
+
+      bar.appendChild(wrap);
+    });
+
+    if (!scLocked) {
+      const addBtn = document.createElement('button');
+      addBtn.className = 'sc-add-btn';
+      addBtn.textContent = '＋';
+      addBtn.title = 'Add shortcut manually';
+      addBtn.addEventListener('click', () => {
+        const label = prompt('Shortcut label (e.g. "My App"):');
+        if (!label || !label.trim()) return;
+        const url = prompt('URL (e.g. https://myapp.com):');
+        if (!url || !url.trim()) return;
+        const fullUrl = url.startsWith('http') ? url.trim() : 'https://' + url.trim();
+        scShortcuts.push({ label: label.trim(), url: fullUrl });
+        scSave(); scRender();
+        toast('✅ Shortcut added: ' + label.trim());
+      });
+      bar.appendChild(addBtn);
+    }
+
+    const lockBtn = document.createElement('button');
+    lockBtn.className = 'sc-lock-btn' + (scLocked ? ' locked' : '');
+    lockBtn.textContent = scLocked ? '🔒' : '🔓';
+    lockBtn.title = scLocked ? 'Unlock to edit shortcuts' : 'Lock shortcuts';
+    lockBtn.addEventListener('click', () => {
+      scLocked = !scLocked;
+      scSave(); scRender();
+      toast(scLocked ? '🔒 Shortcuts locked' : '🔓 Shortcuts unlocked');
+    });
+    bar.appendChild(lockBtn);
+
+    const collapseBtn = document.createElement('button');
+    collapseBtn.id = 'scCollapseBtn';
+    collapseBtn.className = 'sc-collapse-btn' + (uiCollapsed ? ' collapsed' : '');
+    collapseBtn.textContent = uiCollapsed ? '▲' : '▼';
+    collapseBtn.title = uiCollapsed ? 'Expand UI' : 'Collapse UI';
+    collapseBtn.addEventListener('click', toggleUICollapse);
+    bar.appendChild(collapseBtn);
+  }
+
+  // ── UI Collapse Toggle ──────────────────────────────────────────────
+  var uiCollapsed = localStorage.getItem('aicompiler_ui_collapsed') === 'true';
+  if (uiCollapsed) document.body.classList.add('ui-collapsed');
+
+  function toggleUICollapse() {
+    uiCollapsed = !uiCollapsed;
+    document.body.classList.toggle('ui-collapsed', uiCollapsed);
+    localStorage.setItem('aicompiler_ui_collapsed', String(uiCollapsed));
+    const btn = document.getElementById('scCollapseBtn');
+    if (btn) {
+      btn.textContent = uiCollapsed ? '▲' : '▼';
+      btn.title = uiCollapsed ? 'Expand UI' : 'Collapse UI';
+      btn.classList.toggle('collapsed', uiCollapsed);
+    }
+  }
+
+  scLoad(); scRender();
+
+  function startClipboardPolling() { /* manual mode — nothing to poll */ }
+
+  function parseSmartBlock(text) {
+    if (text.includes('===SPLIT===')) {
+      const idx = text.indexOf('===SPLIT===');
+      const oldPart = text.slice(0, idx).trim();
+      const newPart = text.slice(idx + 11).trim();
+      if (oldPart.length > 0 && newPart.length > 0) return { oldCode: oldPart, newCode: newPart };
+    }
+    if (sourceContent) {
+      const parts = text.split(/\n\s*\n/);
+      if (parts.length === 2) {
+        const oldPart = parts[0].trim();
+        const newPart = parts[1].trim();
+        if (oldPart.length > 10 && newPart.length > 0 && sourceContent.includes(oldPart)) {
+          return { oldCode: oldPart, newCode: newPart };
+        }
+      }
+    }
+    return null;
+  }
+
+  async function autoLockAndApply(parsed) {
+    if (!sourceContent) return false;
+
+    const loc = findFingerprintedChunk(sourceContent, parsed.oldCode);
+    if (!loc) {
+      showErr(`Chunk not found in source.\n\nThe patch's OLD block didn't match anything:\n"${parsed.oldCode.slice(0, 120).trim()}${parsed.oldCode.length > 120 ? '…' : ''}"`);
+      return false;
+    }
+    
+    if (loc.isFuzzy && loc.confidence < 70) {
+      showErr(`Low confidence match (${loc.confidence}%) — patch not applied.\n\nThe OLD block matched fuzzily but not reliably enough.\nTry sending a larger context window around the change.`);
+      return false;
+    }
+
+    let newT = parsed.newCode.replace(/\r\n/g, '\n');
+    const currentLoc = findFingerprintedChunk(sourceContent, loc.originalText);
+    if (!currentLoc) return false;
+
+    pushState();
+
+    if (newT.length > 0) {
+      let lines = newT.split('\n');
+      let minIndent = Math.min(...lines.filter(l => l.trim()).map(l => l.match(/^[ \t]*/)[0].length));
+      let neededIndent = currentLoc.baseIndent;
+      if (neededIndent.length > minIndent) {
+        const padding = neededIndent.substring(minIndent);
+        lines = lines.map((l, i) => i === 0 ? l : padding + l);
+        newT = lines.join('\n');
+      }
+    }
+
+    sourceContent = sourceContent.slice(0, currentLoc.startIndex) + newT + sourceContent.slice(currentLoc.endIndex);
+    render(sourceContent);
+    if (fileHandle) await nativeSilentSave(sourceContent);
+    const ok = astGuardAfterApply();
+    if (ok) toast(`⚡ Auto-Applied!${loc.isFuzzy ? ` (${loc.confidence}% match)` : ''}`);
+    return ok;
+  }
+
+  function addToHistory(text) {
+    if(!text || clipHistoryArray[0] === text) return;
+    clipHistoryArray.unshift(text);
+    if(clipHistoryArray.length > 10) clipHistoryArray.pop();
+    const sel = document.getElementById('clipHistory');
+    sel.innerHTML = '<option value="">📋 History</option>';
+    clipHistoryArray.forEach((c, i) => {
+        let preview = c.replace(/\s+/g, ' ').substring(0, 30) + '...';
+        sel.innerHTML += `<option value="${i}">${i+1}: ${preview}</option>`;
+    });
+  }
+
+  document.getElementById('clipHistory').addEventListener('change', (e) => {
+    const val = e.target.value;
+    if(val !== "") {
+        lastClip = clipHistoryArray[val];
+        toast("📋 Loaded from history — Press Paste & Process");
+        e.target.value = "";
+    }
+  });
+</script>
+</body>
+</html>
